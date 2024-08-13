@@ -89,11 +89,4 @@ func main() {
 	if err := tx.Commit(); err != nil {
 		log.Fatal(err)
 	}
-
-	var count int
-	err = db.QueryRow("SELECT COUNT(*) FROM test_results").Scan(&count)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Printf("Inserted %d test results", count)
 }

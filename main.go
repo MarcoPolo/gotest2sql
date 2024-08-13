@@ -1,0 +1,99 @@
+// gotest2sql inserts the output of go test -json ./... into a sqlite database
+package main
+
+import (
+	"bufio"
+	"database/sql"
+	"encoding/json"
+	"flag"
+	"log"
+	"os"
+	"time"
+
+	_ "github.com/glebarez/go-sqlite"
+)
+
+type TestEvent struct {
+	Time    time.Time // encodes as an RFC3339-format string
+	Action  string
+	Package string
+	Test    string
+	Elapsed float64 // seconds
+	Output  string
+}
+
+func main() {
+	outputPath := flag.String("output", "", "output db file")
+	flag.Parse()
+
+	if *outputPath == "" {
+		log.Fatal("-output path is required")
+	}
+
+	db, err := sql.Open("sqlite", *outputPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Create a table to store test results.
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS test_results (
+			Time TEXT,
+			Action TEXT,
+			Package TEXT,
+			Test TEXT,
+			Elapsed REAL,
+			Output TEXT
+	)`)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Prepare the insert statement once
+	stmt, err := tx.Prepare(`
+    INSERT INTO test_results (Time, Action, Package, Test, Elapsed, Output)
+    VALUES (?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer stmt.Close() // Ensure the statement is closed after use
+
+	s := bufio.NewScanner(os.Stdin)
+	for s.Scan() {
+		line := s.Bytes()
+		var ev TestEvent
+		err = json.Unmarshal(line, &ev)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		_, err = stmt.Exec(
+			ev.Time.Format(time.RFC3339Nano),
+			ev.Action,
+			ev.Package,
+			ev.Test,
+			ev.Elapsed,
+			ev.Output,
+		)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	// Commit the transaction
+	if err := tx.Commit(); err != nil {
+		log.Fatal(err)
+	}
+
+	var count int
+	err = db.QueryRow("SELECT COUNT(*) FROM test_results").Scan(&count)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("Inserted %d test results", count)
+}

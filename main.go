@@ -43,7 +43,8 @@ func main() {
 			Package TEXT,
 			Test TEXT,
 			Elapsed REAL,
-			Output TEXT
+			Output TEXT,
+			BatchInsertTime TEXT
 	)`)
 	if err != nil {
 		log.Fatal(err)
@@ -55,9 +56,10 @@ func main() {
 	}
 
 	// Prepare the insert statement once
+	insertTime := time.Now().Format(time.RFC3339Nano)
 	stmt, err := tx.Prepare(`
-    INSERT INTO test_results (Time, Action, Package, Test, Elapsed, Output)
-    VALUES (?, ?, ?, ?, ?, ?)`)
+    INSERT INTO test_results (Time, Action, Package, Test, Elapsed, Output, BatchInsertTime)
+    VALUES (?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -79,6 +81,7 @@ func main() {
 			ev.Test,
 			ev.Elapsed,
 			ev.Output,
+			insertTime,
 		)
 		if err != nil {
 			log.Fatal(err)

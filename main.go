@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -24,6 +25,7 @@ type TestEvent struct {
 
 func main() {
 	outputPath := flag.String("output", "", "output db file")
+	verbose := flag.Bool("v", false, "Print test output to stdout")
 	flag.Parse()
 
 	if *outputPath == "" {
@@ -72,6 +74,9 @@ func main() {
 		err = json.Unmarshal(line, &ev)
 		if err != nil {
 			log.Fatal(err)
+		}
+		if *verbose && ev.Action == "output" {
+			fmt.Println(ev.Output)
 		}
 
 		_, err = stmt.Exec(
